@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "617565505738",
+    "project_id": "saferun-a1ccc",
+    "storage_bucket": "saferun-a1ccc.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:617565505738:android:43ab99503420f30a934c33",
+        "android_client_info": {
+          "package_name": "com.example.saferun"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCsC1fTZc3D6nFtK8SdVxVVfnTMIwDBuhg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
