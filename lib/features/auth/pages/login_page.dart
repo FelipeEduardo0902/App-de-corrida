@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'register_page.dart';
+import 'reset_password_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -12,6 +14,7 @@ class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _loading = false;
+  bool _obscurePassword = true;
 
   Future<void> _login() async {
     setState(() => _loading = true);
@@ -22,9 +25,26 @@ class _LoginPageState extends State<LoginPage> {
       );
       // AuthGate no main.dart já redireciona para Home
     } on FirebaseAuthException catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.message ?? "Erro no login")));
+      String message;
+      switch (e.code) {
+        case 'user-not-found':
+          message = "Usuário não encontrado. Verifique o e-mail.";
+          break;
+        case 'wrong-password':
+          message = "Senha incorreta. Tente novamente.";
+          break;
+        case 'invalid-email':
+          message = "E-mail inválido. Verifique o formato.";
+          break;
+        default:
+          message = "Credenciais incorretas. Tente novamente.";
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -41,36 +61,74 @@ class _LoginPageState extends State<LoginPage> {
             const Icon(
               Icons.directions_run,
               size: 100,
-              color: Colors.greenAccent,
+              color: Color(0xFFFC4C02), // cor laranja principal
             ),
             const SizedBox(height: 40),
+
+            // Campo e-mail
             TextField(
               controller: _emailController,
-              decoration: const InputDecoration(labelText: "E-mail"),
-              style: const TextStyle(color: Colors.white),
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
+                labelText: "E-mail",
+                prefixIcon: Icon(Icons.email),
+              ),
             ),
             const SizedBox(height: 20),
+
+            // Campo senha com olhinho
             TextField(
               controller: _passwordController,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: "Senha"),
-              style: const TextStyle(color: Colors.white),
+              obscureText: _obscurePassword,
+              decoration: InputDecoration(
+                labelText: "Senha",
+                prefixIcon: const Icon(Icons.lock),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _obscurePassword = !_obscurePassword;
+                    });
+                  },
+                ),
+              ),
             ),
             const SizedBox(height: 30),
+
             _loading
-                ? const CircularProgressIndicator(color: Colors.greenAccent)
+                ? const CircularProgressIndicator(color: Color(0xFFFC4C02))
                 : ElevatedButton(
                     onPressed: _login,
                     child: const Text("Entrar"),
                   ),
             const SizedBox(height: 16),
+
             TextButton(
               onPressed: () {
-                Navigator.pushNamed(context, '/register');
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const RegisterPage()),
+                );
               },
               child: const Text(
                 "Criar nova conta",
-                style: TextStyle(color: Colors.blueAccent),
+                style: TextStyle(color: Colors.black87),
+              ),
+            ),
+
+            TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => const ResetPasswordPage()),
+                );
+              },
+              child: const Text(
+                "Esqueci minha senha",
+                style: TextStyle(color: Colors.black54),
               ),
             ),
           ],

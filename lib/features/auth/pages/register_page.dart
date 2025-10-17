@@ -13,13 +13,14 @@ class _RegisterPageState extends State<RegisterPage> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _loading = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirm = true;
 
   Future<void> _register() async {
-    if (_passwordController.text.trim() !=
-        _confirmPasswordController.text.trim()) {
+    if (_passwordController.text != _confirmPasswordController.text) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text("As senhas não coincidem")));
+      ).showSnackBar(const SnackBar(content: Text("As senhas não coincidem.")));
       return;
     }
 
@@ -29,13 +30,21 @@ class _RegisterPageState extends State<RegisterPage> {
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-      if (mounted) {
-        Navigator.pop(context); // volta para login
-      }
+      if (mounted) Navigator.pop(context); // volta pro login
     } on FirebaseAuthException catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.message ?? "Erro no cadastro")));
+      String message = "Erro ao registrar usuário.";
+      if (e.code == 'weak-password') {
+        message = "Senha muito fraca. Use pelo menos 6 caracteres.";
+      } else if (e.code == 'email-already-in-use') {
+        message = "Este e-mail já está em uso.";
+      } else if (e.code == 'invalid-email') {
+        message = "E-mail inválido.";
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -52,29 +61,59 @@ class _RegisterPageState extends State<RegisterPage> {
           children: [
             TextField(
               controller: _emailController,
-              decoration: const InputDecoration(labelText: "E-mail"),
-              style: const TextStyle(color: Colors.white),
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
+                labelText: "E-mail",
+                prefixIcon: Icon(Icons.email),
+              ),
             ),
             const SizedBox(height: 20),
+
             TextField(
               controller: _passwordController,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: "Senha"),
-              style: const TextStyle(color: Colors.white),
+              obscureText: _obscurePassword,
+              decoration: InputDecoration(
+                labelText: "Senha",
+                prefixIcon: const Icon(Icons.lock),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _obscurePassword = !_obscurePassword;
+                    });
+                  },
+                ),
+              ),
             ),
             const SizedBox(height: 20),
+
             TextField(
               controller: _confirmPasswordController,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: "Confirmar Senha"),
-              style: const TextStyle(color: Colors.white),
+              obscureText: _obscureConfirm,
+              decoration: InputDecoration(
+                labelText: "Confirmar Senha",
+                prefixIcon: const Icon(Icons.lock),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscureConfirm ? Icons.visibility_off : Icons.visibility,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _obscureConfirm = !_obscureConfirm;
+                    });
+                  },
+                ),
+              ),
             ),
             const SizedBox(height: 30),
+
             _loading
-                ? const CircularProgressIndicator(color: Colors.greenAccent)
+                ? const CircularProgressIndicator(color: Color(0xFFFC4C02))
                 : ElevatedButton(
                     onPressed: _register,
-                    child: const Text("Cadastrar"),
+                    child: const Text("Registrar"),
                   ),
           ],
         ),

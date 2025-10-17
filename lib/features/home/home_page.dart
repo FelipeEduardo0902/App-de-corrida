@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../dashboard/dashboard_page.dart';
-import '../run/run_page.dart';
+import '../run/pages/run_page.dart';
 import '../training/training_page.dart';
 import '../history/history_page.dart';
 import '../profile/profile_page.dart';
@@ -15,10 +15,11 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
 
-  final List<Widget> _pages = const [
+  // 🔹 Páginas do menu inferior
+  late final List<Widget> _pages = const [
     DashboardPage(),
     RunPage(),
-    TrainingPage(),
+    TrainingPage(), // ✅ Agora sem parâmetro (lista e cria treinos)
     HistoryPage(),
     ProfilePage(),
   ];
@@ -35,7 +36,7 @@ class _HomePageState extends State<HomePage> {
       body: _pages[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
-        selectedItemColor: Colors.green,
+        selectedItemColor: Colors.orange,
         unselectedItemColor: Colors.black54,
         type: BottomNavigationBarType.fixed,
         onTap: _onItemTapped,

@@ -2,17 +2,16 @@ name: saferun
 description: "A new Flutter project."
 
 publish_to: 'none'
-
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.9.2
+  sdk: '>=3.9.0 <4.0.0'
 
 dependencies:
   flutter:
     sdk: flutter
 
-  # UI e ícones
+  # UI e gerenciamento de estado
   cupertino_icons: ^1.0.8
   provider: ^6.1.2
 
@@ -21,6 +20,20 @@ dependencies:
   firebase_auth: ^6.1.0
   cloud_firestore: ^6.0.2
 
+  # GPS e mapas
+  google_maps_flutter: ^2.10.0
+  geolocator: ^14.0.2
+  flutter_map: ^8.2.2
+  latlong2: ^0.9.1
+  app_settings: ^5.1.1
+  shared_preferences: ^2.3.2
+  reorderables: ^0.6.0
+  intl: ^0.20.2
+
+  # ⚙️ Modo relógio — correções
+  vibration: ^3.1.4
+  flutter_tts: ^3.8.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -28,7 +41,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-
-  # Caso queira adicionar imagens no futuro
-  # assets:
-  #   - assets/images/
