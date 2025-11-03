@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:latlong2/latlong.dart'; // ✅ usamos sempre latlong2
+import 'package:latlong2/latlong.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/workout.dart';
 import '../services/workout_service.dart';
+import '../../training/models/workout_plan.dart'; // ✅ Importa o plano de treino
 
 class RunVM extends ChangeNotifier {
   final _workoutService = WorkoutService();
@@ -29,7 +30,34 @@ class RunVM extends ChangeNotifier {
   bool _paused = false;
   bool get isPaused => _paused;
 
-  /// Inicia corrida
+  WorkoutPlan? _currentPlan;
+  WorkoutPlan? get currentPlan => _currentPlan;
+
+  /// 🔹 Reinicia o estado completamente
+  void reset() {
+    _timer?.cancel();
+    _positionSub?.cancel();
+    _elapsed = Duration.zero;
+    _distance = 0;
+    _lastPosition = null;
+    _route.clear();
+    _running = false;
+    _paused = false;
+    notifyListeners();
+  }
+
+  /// 🔹 Carrega um treino planejado
+  void loadWorkoutPlan(WorkoutPlan plan) {
+    reset();
+    _currentPlan = plan;
+    debugPrint(
+      "🏋️ Treino carregado: ${plan.name} (${plan.steps.length} etapas)",
+    );
+    debugPrint("Distância total: ${plan.totalDistance.toStringAsFixed(0)} m");
+    notifyListeners();
+  }
+
+  /// ▶️ Inicia corrida (livre ou com treino)
   Future<void> start() async {
     _elapsed = Duration.zero;
     _distance = 0;
@@ -94,10 +122,12 @@ class RunVM extends ChangeNotifier {
           _lastPosition = pos;
           _route.add(current);
           notifyListeners();
+
+          // 🔸 Se for um treino planejado, podemos detectar o fim de uma etapa futuramente aqui
         });
   }
 
-  /// Pausa corrida
+  /// ⏸️ Pausa corrida
   void pause() {
     if (!_running) return;
     _paused = true;
@@ -106,7 +136,7 @@ class RunVM extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Retoma corrida
+  /// ▶️ Retoma corrida
   void resume() {
     if (!_running || !_paused) return;
     _paused = false;
@@ -120,7 +150,7 @@ class RunVM extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Finaliza e salva corrida no Firestore
+  /// 🏁 Finaliza e salva corrida no Firestore
   Future<void> stopAndSave() async {
     _timer?.cancel();
     _positionSub?.cancel();
@@ -135,23 +165,17 @@ class RunVM extends ChangeNotifier {
       date: DateTime.now(),
       distance: _distance,
       duration: _elapsed,
-      route: List.of(_route), // ✅ rota com latlong2
+      route: List.of(_route),
     );
 
     await _workoutService.saveWorkout(workout, user.uid);
     notifyListeners();
+
+    debugPrint("✅ Corrida salva com sucesso!");
   }
 
-  /// Descartar corrida (sem salvar)
+  /// 🗑️ Descartar corrida (sem salvar)
   void discard() {
-    _timer?.cancel();
-    _positionSub?.cancel();
-    _elapsed = Duration.zero;
-    _distance = 0;
-    _lastPosition = null;
-    _route.clear();
-    _running = false;
-    _paused = false;
-    notifyListeners();
+    reset();
   }
 }

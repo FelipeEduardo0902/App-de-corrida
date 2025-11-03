@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart' as gmaps;
 
-import 'vm/history_vm.dart'; // ViewModel
-import '../run/models/workout.dart'; // Modelo
-import '../run/services/workout_service.dart'; // Serviço (acesso Firestore)
-import 'workout_detail_page.dart'; // Detalhes da corrida
-import '../../core/utils/formatters.dart'; // Funções utilitárias
+import 'vm/history_vm.dart';
+import '../run/models/workout.dart';
+import '../run/services/workout_service.dart';
+import '../../core/utils/formatters.dart';
+import '../run/pages/run_detail_page.dart'; // ✅ nova tela de mapa detalhado
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
@@ -32,11 +33,15 @@ class _HistoryPageState extends State<HistoryPage> {
     final vm = context.watch<HistoryVM>();
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF7F7F7),
       appBar: AppBar(
-        title: const Text("Histórico de Corridas"),
-        backgroundColor: Colors.blueAccent,
+        backgroundColor: Colors.white,
+        elevation: 0.8,
+        title: const Text(
+          "Histórico de Corridas",
+          style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
-        elevation: 2,
       ),
       body: _buildBody(vm),
     );
@@ -44,7 +49,9 @@ class _HistoryPageState extends State<HistoryPage> {
 
   Widget _buildBody(HistoryVM vm) {
     if (vm.loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: CircularProgressIndicator(color: Colors.orange),
+      );
     }
 
     if (vm.error != null) {
@@ -54,13 +61,14 @@ class _HistoryPageState extends State<HistoryPage> {
     if (vm.workouts.isEmpty) {
       return const Center(
         child: Text(
-          "Nenhuma corrida registrada.",
-          style: TextStyle(fontSize: 16),
+          "🏃 Nenhuma corrida registrada ainda.\nComece uma para ver seu histórico aqui!",
+          style: TextStyle(fontSize: 16, color: Colors.black54),
+          textAlign: TextAlign.center,
         ),
       );
     }
 
-    // 🔹 Agrupa corridas por data (dd/MM/yyyy)
+    // Agrupa corridas por data
     final grouped = <String, List<Workout>>{};
     for (final w in vm.workouts) {
       final key =
@@ -68,106 +76,173 @@ class _HistoryPageState extends State<HistoryPage> {
       grouped.putIfAbsent(key, () => []).add(w);
     }
 
-    // 🔹 Ordena datas (mais recentes primeiro)
     final sortedKeys = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
 
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      itemCount: sortedKeys.length,
-      itemBuilder: (context, i) {
-        final dateKey = sortedKeys[i];
-        final workoutsOfDay = grouped[dateKey]!;
+    // Estatísticas gerais
+    final totalRuns = vm.workouts.length;
+    final totalKm = vm.workouts.fold<double>(
+      0,
+      (sum, w) => sum + w.distance / 1000,
+    );
+    final totalTime = vm.workouts.fold<int>(
+      0,
+      (sum, w) => sum + w.duration.inMinutes,
+    );
+    final avgPace = totalKm > 0 ? totalTime / totalKm : 0;
 
-        // 🔹 Calcula total do dia (opcional)
-        final totalKm = workoutsOfDay.fold<double>(
-          0,
-          (sum, w) => sum + w.distance / 1000,
-        );
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Cabeçalho com data e total de km
-            Padding(
-              padding: const EdgeInsets.only(top: 12, bottom: 6, left: 4),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    dateKey,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blueGrey,
-                    ),
-                  ),
-                  Text(
-                    "${totalKm.toStringAsFixed(2)} km",
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey,
-                    ),
-                  ),
-                ],
-              ),
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // 🔹 Resumo do usuário
+        Card(
+          color: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          elevation: 2,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 18),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _metric("Corridas", "$totalRuns", Icons.directions_run),
+                _metric(
+                  "Distância",
+                  "${totalKm.toStringAsFixed(1)} km",
+                  Icons.route,
+                ),
+                _metric(
+                  "Pace médio",
+                  "${avgPace.toStringAsFixed(1)} min/km",
+                  Icons.timer_outlined,
+                ),
+              ],
             ),
+          ),
+        ),
+        const SizedBox(height: 16),
 
-            // Lista de corridas do dia
-            ...workoutsOfDay.map((w) {
-              final km = (w.distance / 1000).toStringAsFixed(2);
-              final pace = w.distance > 0
-                  ? (w.duration.inMinutes / (w.distance / 1000))
-                        .toStringAsFixed(2)
-                  : "0.0";
-              final time =
-                  "${w.date.hour.toString().padLeft(2, '0')}:${w.date.minute.toString().padLeft(2, '0')}";
+        // 🔹 Lista por data
+        ...sortedKeys.map((dateKey) {
+          final workoutsOfDay = grouped[dateKey]!;
+          final totalKmDay = workoutsOfDay.fold<double>(
+            0,
+            (sum, w) => sum + w.distance / 1000,
+          );
 
-              return Card(
-                elevation: 3,
-                shadowColor: Colors.grey.shade300,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                margin: const EdgeInsets.symmetric(vertical: 6),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  leading: const CircleAvatar(
-                    backgroundColor: Colors.blueAccent,
-                    child: Icon(Icons.directions_run, color: Colors.white),
-                  ),
-                  title: Text(
-                    "$km km",
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  subtitle: Text(
-                    "Ritmo: $pace min/km | Duração: ${formatDuration(w.duration)}",
-                    style: const TextStyle(fontSize: 13),
-                  ),
-                  trailing: Text(
-                    time,
-                    style: const TextStyle(color: Colors.grey),
-                  ),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => WorkoutDetailPage(workout: w),
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Cabeçalho da data
+              Padding(
+                padding: const EdgeInsets.only(top: 18, bottom: 8, left: 6),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      dateKey,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 17,
+                        color: Colors.black87,
                       ),
-                    );
-                  },
+                    ),
+                    Text(
+                      "${totalKmDay.toStringAsFixed(2)} km",
+                      style: const TextStyle(
+                        color: Colors.orange,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
-              );
-            }).toList(),
-          ],
-        );
-      },
+              ),
+
+              // Lista de corridas do dia
+              ...workoutsOfDay.map((w) {
+                final km = (w.distance / 1000).toStringAsFixed(2);
+                final pace = w.distance > 0
+                    ? (w.duration.inMinutes / (w.distance / 1000))
+                          .toStringAsFixed(1)
+                    : "0.0";
+                final time =
+                    "${w.date.hour.toString().padLeft(2, '0')}:${w.date.minute.toString().padLeft(2, '0')}";
+
+                return Card(
+                  elevation: 2,
+                  margin: const EdgeInsets.symmetric(vertical: 6),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: ListTile(
+                    leading: Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.directions_run,
+                        color: Colors.orange,
+                        size: 26,
+                      ),
+                    ),
+                    title: Text(
+                      "$km km em ${formatDuration(w.duration)}",
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    subtitle: Text(
+                      "Ritmo médio: $pace min/km",
+                      style: const TextStyle(
+                        color: Colors.black54,
+                        fontSize: 13,
+                      ),
+                    ),
+                    trailing: Text(
+                      time,
+                      style: const TextStyle(color: Colors.grey, fontSize: 13),
+                    ),
+                    // ✅ Ao clicar: abre o mapa com percurso percorrido
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => RunDetailPage(workout: w),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              }),
+            ],
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _metric(String title, String value, IconData icon) {
+    return Column(
+      children: [
+        Icon(icon, color: Colors.orange, size: 22),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+        ),
+        Text(
+          title,
+          style: const TextStyle(color: Colors.black54, fontSize: 13),
+        ),
+      ],
     );
   }
 }

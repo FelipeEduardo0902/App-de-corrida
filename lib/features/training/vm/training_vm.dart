@@ -87,8 +87,8 @@ class TrainingVM extends ChangeNotifier {
           .collection('workouts')
           .doc(plan.id)
           .set(plan.toMap());
-      debugPrint("✅ Treino '${plan.name}' salvo com sucesso!");
 
+      debugPrint("✅ Treino '${plan.name}' salvo com sucesso!");
       await loadWorkouts();
     } catch (e, s) {
       debugPrint("❌ Erro ao salvar treino: $e");
@@ -111,6 +111,7 @@ class TrainingVM extends ChangeNotifier {
           .collection('workouts')
           .doc(id)
           .delete();
+
       _workouts.removeWhere((t) => t.id == id);
       notifyListeners();
       debugPrint("✅ Treino removido localmente e no Firestore!");
@@ -146,5 +147,27 @@ class TrainingVM extends ChangeNotifier {
     debugPrint("📡 Enviando treino '${plan.name}' para o relógio...");
     await Future.delayed(const Duration(seconds: 2));
     debugPrint("✅ Treino '${plan.name}' enviado com sucesso!");
+  }
+
+  // ======================================================
+  // 🔹 Cálculos agregados (para exibir resumo do treino)
+  // ======================================================
+
+  double get totalDistance {
+    double total = 0;
+    for (final step in _steps) {
+      total += (step.targetDistance * step.repeatCount);
+    }
+    return total;
+  }
+
+  Duration get totalDuration {
+    Duration total = Duration.zero;
+    for (final step in _steps) {
+      if (step.targetDuration != null) {
+        total += step.targetDuration! * step.repeatCount;
+      }
+    }
+    return total;
   }
 }
