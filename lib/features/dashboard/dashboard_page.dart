@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -17,17 +19,61 @@ class _DashboardPageState extends State<DashboardPage> {
   int totalRuns = 0;
   double avgPace = 0;
   bool loadingStats = true;
-  List<Map<String, dynamic>> feedPosts = [];
+  bool localeLoaded = false;
+
+  String? profilePhoto;
+  String username = "Runner";
+
+  final List<Color> cardColors = [
+    const Color(0xFFFFF3E0),
+    const Color(0xFFE3F2FD),
+    const Color(0xFFE8F5E9),
+    const Color(0xFFF3E5F5),
+    const Color(0xFFFFEBEE),
+  ];
 
   @override
   void initState() {
     super.initState();
-    _loadStats();
-    _loadFeed();
+    _initializeLocaleAndLoad();
+    _loadUserInfo();
+  }
+
+  Future<void> _initializeLocaleAndLoad() async {
+    try {
+      await initializeDateFormatting('pt_BR', null);
+      setState(() => localeLoaded = true);
+      await _loadStats();
+    } catch (e) {
+      debugPrint("Erro ao inicializar locale: $e");
+    }
+  }
+
+  Future<void> _loadUserInfo() async {
+    if (user == null) return;
+
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user!.uid)
+          .get();
+      final data = doc.data() ?? {};
+
+      setState(() {
+        username = data["name"] ?? user!.email!.split('@')[0];
+        profilePhoto = data["profilePhoto"];
+      });
+    } catch (e) {
+      debugPrint("❌ Erro ao carregar dados do usuário: $e");
+    }
   }
 
   Future<void> _loadStats() async {
-    if (user == null) return;
+    if (user == null) {
+      setState(() => loadingStats = false);
+      return;
+    }
+
     try {
       final snapshot = await _db
           .collection('users')
@@ -42,7 +88,7 @@ class _DashboardPageState extends State<DashboardPage> {
       for (final doc in snapshot.docs) {
         final data = doc.data();
         final distance = (data['distance'] ?? 0).toDouble();
-        final duration = (data['duration'] ?? 0).toInt(); // segundos
+        final duration = (data['duration'] ?? 0).toInt();
         kmSum += distance / 1000;
         if (distance > 0) {
           totalPaceSum += (duration / 60) / (distance / 1000);
@@ -57,93 +103,19 @@ class _DashboardPageState extends State<DashboardPage> {
       });
     } catch (e) {
       debugPrint("❌ Erro ao carregar estatísticas: $e");
+      setState(() => loadingStats = false);
     }
-  }
-
-  Future<void> _loadFeed() async {
-    try {
-      final snapshot = await _db.collection('feed_posts').get();
-      setState(() {
-        feedPosts = snapshot.docs
-            .map((doc) => {'id': doc.id, ...doc.data()})
-            .toList();
-      });
-    } catch (e) {
-      debugPrint("❌ Erro ao carregar feed: $e");
-    }
-  }
-
-  Future<void> _addPost() async {
-    final titleController = TextEditingController();
-    final textController = TextEditingController();
-
-    await showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        title: const Text("Adicionar nova dica 🏃‍♂️"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: titleController,
-              decoration: const InputDecoration(labelText: "Título"),
-            ),
-            TextField(
-              controller: textController,
-              decoration: const InputDecoration(labelText: "Conteúdo"),
-              maxLines: 3,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancelar"),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            onPressed: () async {
-              if (titleController.text.isNotEmpty &&
-                  textController.text.isNotEmpty) {
-                await _db.collection('feed_posts').add({
-                  'title': titleController.text,
-                  'text': textController.text,
-                  'createdAt': Timestamp.now(),
-                });
-                Navigator.pop(context);
-                _loadFeed();
-              }
-            },
-            child: const Text("Salvar", style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _deletePost(String id) async {
-    await _db.collection('feed_posts').doc(id).delete();
-    _loadFeed();
   }
 
   @override
   Widget build(BuildContext context) {
-    final username = user?.email?.split('@')[0] ?? 'Runner';
-
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F7F7),
+      backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
         backgroundColor: Colors.black,
         elevation: 2,
         title: const Text(
-          "SafeRun Dashboard",
+          "SafeRun",
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         actions: [
@@ -157,107 +129,201 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.orange,
-        onPressed: _addPost,
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // 🔹 Cabeçalho do usuário
-          Row(
-            children: [
-              const CircleAvatar(
-                radius: 28,
-                backgroundImage: AssetImage("assets/avatar_placeholder.png"),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  "Bem-vindo, $username 👋",
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await _loadUserInfo();
+          await _loadStats();
+        },
+        child: !localeLoaded
+            ? const Center(
+                child: CircularProgressIndicator(color: Colors.orange),
+              )
+            : ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  // Cabeçalho com foto real
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 28,
+                        backgroundImage: profilePhoto != null
+                            ? NetworkImage(profilePhoto!)
+                            : const AssetImage("assets/avatar_placeholder.png")
+                                  as ImageProvider,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          "Bem-vindo, $username 👋",
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
+                  const SizedBox(height: 20),
 
-          // 🔹 Estatísticas de corrida
-          if (loadingStats)
-            const Center(child: CircularProgressIndicator(color: Colors.orange))
-          else
-            Row(
-              children: [
-                _StatCard(label: "Total KM", value: totalKm.toStringAsFixed(1)),
-                const SizedBox(width: 12),
-                _StatCard(label: "Corridas", value: "$totalRuns"),
-                const SizedBox(width: 12),
-                _StatCard(
-                  label: "Pace Médio",
-                  value: avgPace > 0
-                      ? "${avgPace.toStringAsFixed(1)} min/km"
-                      : "—",
-                ),
-              ],
-            ),
-          const SizedBox(height: 30),
+                  // Estatísticas
+                  if (loadingStats)
+                    const Center(
+                      child: CircularProgressIndicator(color: Colors.orange),
+                    )
+                  else
+                    Row(
+                      children: [
+                        _StatCard(
+                          label: "Total KM",
+                          value: totalKm.toStringAsFixed(1),
+                        ),
+                        const SizedBox(width: 12),
+                        _StatCard(label: "Corridas", value: "$totalRuns"),
+                        const SizedBox(width: 12),
+                        _StatCard(
+                          label: "Pace Médio",
+                          value: avgPace > 0
+                              ? "${avgPace.toStringAsFixed(1)} min/km"
+                              : "—",
+                        ),
+                      ],
+                    ),
+                  const SizedBox(height: 30),
 
-          // 🔹 Feed de dicas
-          const Text(
-            "📢 Feed de Dicas",
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          if (feedPosts.isEmpty)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 20),
-                child: Text(
-                  "Nenhuma dica publicada ainda.",
-                  style: TextStyle(color: Colors.black54),
-                ),
-              ),
-            )
-          else
-            ...feedPosts.map(
-              (p) => Card(
-                margin: const EdgeInsets.symmetric(vertical: 8),
-                elevation: 1,
-                child: ListTile(
-                  title: Text(
-                    p['title'] ?? '',
-                    style: const TextStyle(
+                  // Dicas de Treino
+                  const Text(
+                    "💡 Dicas de Treino e Motivação",
+                    style: TextStyle(
+                      fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFFFC4C02),
+                      color: Colors.black87,
                     ),
                   ),
-                  subtitle: Text(
-                    p['text'] ?? '',
-                    style: const TextStyle(color: Colors.black87),
+                  const SizedBox(height: 16),
+
+                  StreamBuilder<QuerySnapshot>(
+                    stream: _db
+                        .collection('feed')
+                        .orderBy('data', descending: true)
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(
+                          child: CircularProgressIndicator(
+                            color: Colors.orange,
+                          ),
+                        );
+                      }
+
+                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 40),
+                          child: Center(
+                            child: Text(
+                              "Nenhuma dica publicada ainda. Vá em Perfil → Gerenciar Dicas para adicionar!",
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.black54,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+
+                      final docs = snapshot.data!.docs;
+
+                      return Column(
+                        children: List.generate(docs.length, (i) {
+                          final d = docs[i].data() as Map<String, dynamic>;
+                          final titulo = d['titulo'] ?? '';
+                          final descricao = d['descricao'] ?? '';
+                          final data = (d['data'] as Timestamp).toDate();
+                          final color = cardColors[i % cardColors.length];
+
+                          final dataFormatada = toBeginningOfSentenceCase(
+                            DateFormat(
+                              "d 'de' MMMM 'de' yyyy",
+                              'pt_BR',
+                            ).format(data),
+                          )!;
+
+                          return AnimatedContainer(
+                            duration: const Duration(milliseconds: 300),
+                            margin: const EdgeInsets.only(bottom: 14),
+                            decoration: BoxDecoration(
+                              color: color,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.07),
+                                  blurRadius: 5,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                              leading: Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.8),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(
+                                  Icons.fitness_center,
+                                  color: Colors.orange,
+                                  size: 26,
+                                ),
+                              ),
+                              title: Text(
+                                titulo,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: Color(0xFFFC4C02),
+                                ),
+                              ),
+                              subtitle: Padding(
+                                padding: const EdgeInsets.only(top: 6),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      descricao,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.black87,
+                                        height: 1.4,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      "📅 $dataFormatada",
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.black54,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
+                      );
+                    },
                   ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline, color: Colors.red),
-                    onPressed: () => _deletePost(p['id']),
-                  ),
-                ),
+                ],
               ),
-            ),
-        ],
       ),
     );
   }
 }
 
-// 🔹 Widget simples de estatísticas
 class _StatCard extends StatelessWidget {
   final String label;
   final String value;
@@ -270,6 +336,7 @@ class _StatCard extends StatelessWidget {
       child: Card(
         color: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        elevation: 2,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(

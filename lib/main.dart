@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:firebase_analytics/observer.dart';
 
 // Firebase
 import 'firebase_options.dart';
@@ -47,8 +49,23 @@ void main() async {
   runApp(const SafeRunApp());
 }
 
-class SafeRunApp extends StatelessWidget {
+class SafeRunApp extends StatefulWidget {
   const SafeRunApp({super.key});
+
+  @override
+  State<SafeRunApp> createState() => _SafeRunAppState();
+}
+
+class _SafeRunAppState extends State<SafeRunApp> {
+  late FirebaseAnalytics analytics;
+  late FirebaseAnalyticsObserver observer;
+
+  @override
+  void initState() {
+    super.initState();
+    analytics = FirebaseAnalytics.instance;
+    observer = FirebaseAnalyticsObserver(analytics: analytics);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -74,6 +91,9 @@ class SafeRunApp extends StatelessWidget {
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             themeMode: themeProvider.themeMode,
+
+            // 🔹 Adiciona o Firebase Analytics Observer
+            navigatorObservers: [observer],
 
             // ✅ Detecta automaticamente se é relógio ou celular
             home: LayoutBuilder(

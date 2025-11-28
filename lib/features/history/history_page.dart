@@ -68,17 +68,18 @@ class _HistoryPageState extends State<HistoryPage> {
       );
     }
 
-    // Agrupa corridas por data
-    final grouped = <String, List<Workout>>{};
+    // 🔹 Agrupa corridas por data real
+    final grouped = <DateTime, List<Workout>>{};
     for (final w in vm.workouts) {
-      final key =
-          "${w.date.day.toString().padLeft(2, '0')}/${w.date.month.toString().padLeft(2, '0')}/${w.date.year}";
-      grouped.putIfAbsent(key, () => []).add(w);
+      final date = DateTime(w.date.year, w.date.month, w.date.day);
+      grouped.putIfAbsent(date, () => []).add(w);
     }
 
-    final sortedKeys = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
+    // 🔹 Ordena da mais recente para a mais antiga
+    final sortedDates = grouped.keys.toList()
+      ..sort((a, b) => b.compareTo(a)); // mais recentes primeiro
 
-    // Estatísticas gerais
+    // 🔹 Estatísticas gerais
     final totalRuns = vm.workouts.length;
     final totalKm = vm.workouts.fold<double>(
       0,
@@ -93,7 +94,7 @@ class _HistoryPageState extends State<HistoryPage> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // 🔹 Resumo do usuário
+        // 🔹 Resumo geral do histórico
         Card(
           color: Colors.white,
           shape: RoundedRectangleBorder(
@@ -122,18 +123,20 @@ class _HistoryPageState extends State<HistoryPage> {
         ),
         const SizedBox(height: 16),
 
-        // 🔹 Lista por data
-        ...sortedKeys.map((dateKey) {
-          final workoutsOfDay = grouped[dateKey]!;
+        // 🔹 Lista agrupada por data
+        ...sortedDates.map((date) {
+          final workoutsOfDay = grouped[date]!;
+          final dateKey =
+              "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}";
           final totalKmDay = workoutsOfDay.fold<double>(
             0,
             (sum, w) => sum + w.distance / 1000,
           );
 
+          // 🔹 Cabeçalho da data
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Cabeçalho da data
               Padding(
                 padding: const EdgeInsets.only(top: 18, bottom: 8, left: 6),
                 child: Row(
@@ -158,7 +161,7 @@ class _HistoryPageState extends State<HistoryPage> {
                 ),
               ),
 
-              // Lista de corridas do dia
+              // 🔹 Corridas desse dia
               ...workoutsOfDay.map((w) {
                 final km = (w.distance / 1000).toStringAsFixed(2);
                 final pace = w.distance > 0
@@ -206,7 +209,6 @@ class _HistoryPageState extends State<HistoryPage> {
                       time,
                       style: const TextStyle(color: Colors.grey, fontSize: 13),
                     ),
-                    // ✅ Ao clicar: abre o mapa com percurso percorrido
                     onTap: () {
                       Navigator.push(
                         context,

@@ -14,11 +14,10 @@ class CreateTrainingPage extends StatefulWidget {
 class _CreateTrainingPageState extends State<CreateTrainingPage> {
   String? _selectedType;
   String? _goalType;
-  double? _distance; // em km
-  int? _duration; // em minutos
+  double? _distance; // km
+  int? _duration; // minutos
   String? _intensity;
   int? _repeats;
-
   double? _estimatedDistance;
 
   final _types = ["Aquecimento", "Corrida", "Descanso", "Desaquecimento"];
@@ -121,7 +120,7 @@ class _CreateTrainingPageState extends State<CreateTrainingPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 🔹 RESUMO DO TREINO
+            // 🔹 Resumo do treino
             Card(
               color: Colors.orange.shade50,
               elevation: 2,
@@ -157,7 +156,7 @@ class _CreateTrainingPageState extends State<CreateTrainingPage> {
             ),
             const SizedBox(height: 16),
 
-            // 🔹 ETAPAS EXISTENTES
+            // 🔹 Etapas adicionadas
             if (steps.isNotEmpty)
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -217,7 +216,7 @@ class _CreateTrainingPageState extends State<CreateTrainingPage> {
                 ],
               ),
 
-            // 🔹 SELEÇÕES
+            // 🔹 Seletor de tipo de etapa
             _buildCard(
               icon: Icons.directions_run,
               label: "Tipo de Etapa",
@@ -228,6 +227,8 @@ class _CreateTrainingPageState extends State<CreateTrainingPage> {
                 onSelected: (v) => setState(() => _selectedType = v),
               ),
             ),
+
+            // 🔹 Tipo de meta
             _buildCard(
               icon: Icons.flag_circle_outlined,
               label: "Tipo de Meta",
@@ -246,20 +247,78 @@ class _CreateTrainingPageState extends State<CreateTrainingPage> {
               ),
             ),
 
+            // 🔹 Campo de distância digitável
             if (_goalType == "Distância")
-              _buildCard(
-                icon: Icons.straighten,
-                label: "Distância (km)",
-                value: _distance != null
-                    ? "${_distance!.toStringAsFixed(2)} km"
-                    : "Selecionar",
-                onTap: () => _openSelector(
-                  title: "Selecione a distância (em km)",
-                  options: List.generate(30, (i) => (i + 1) * 0.5),
-                  onSelected: (v) => setState(() => _distance = v),
+              Card(
+                elevation: 3,
+                margin: const EdgeInsets.only(bottom: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 14,
+                    horizontal: 16,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "Distância (km)",
+                        style: TextStyle(color: Colors.black54, fontSize: 13),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: "Ex: 0.5 = 500 m, 1.0 = 1 km",
+                          filled: true,
+                          fillColor: Colors.grey.shade100,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(
+                              color: Colors.orange.shade300,
+                            ),
+                          ),
+                          focusedBorder: const OutlineInputBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(10)),
+                            borderSide: BorderSide(
+                              color: Colors.orange,
+                              width: 2,
+                            ),
+                          ),
+                        ),
+                        onChanged: (value) {
+                          final parsed = double.tryParse(
+                            value.replaceAll(',', '.'),
+                          );
+                          if (parsed != null && parsed > 0) {
+                            setState(() => _distance = parsed);
+                          } else {
+                            setState(() => _distance = null);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      if (_distance != null)
+                        Text(
+                          _distance! < 1
+                              ? "🏃 Distância atual: ${(_distance! * 1000).toStringAsFixed(0)} m"
+                              : "🏃 Distância atual: ${_distance!.toStringAsFixed(2)} km",
+                          style: const TextStyle(
+                            color: Colors.orange,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
 
+            // 🔹 Campo de tempo (min)
             if (_goalType == "Tempo")
               Card(
                 elevation: 3,
@@ -292,8 +351,8 @@ class _CreateTrainingPageState extends State<CreateTrainingPage> {
                               color: Colors.orange.shade300,
                             ),
                           ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
+                          focusedBorder: const OutlineInputBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(10)),
                             borderSide: BorderSide(
                               color: Colors.orange,
                               width: 2,
@@ -313,6 +372,7 @@ class _CreateTrainingPageState extends State<CreateTrainingPage> {
                 ),
               ),
 
+            // 🔹 Intensidade
             _buildCard(
               icon: Icons.fitness_center,
               label: "Intensidade",
@@ -327,6 +387,7 @@ class _CreateTrainingPageState extends State<CreateTrainingPage> {
               ),
             ),
 
+            // 🔹 Distância estimada (se meta for por tempo)
             if (_estimatedDistance != null)
               Padding(
                 padding: const EdgeInsets.only(top: 4, bottom: 12),
@@ -341,6 +402,7 @@ class _CreateTrainingPageState extends State<CreateTrainingPage> {
                 ),
               ),
 
+            // 🔹 Repetições
             _buildCard(
               icon: Icons.repeat,
               label: "Repetições",
